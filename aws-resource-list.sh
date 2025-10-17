@@ -2,28 +2,11 @@
 
 ###############################################################
 # This script will list all the resources in the AWS account.
-# Author: Pratik
-# Version: v0.0.1
-
-# Following are the supported AWS services by the script
-# 1. EC2
-# 2. S3
-# 3. IAM
-# 4. RDS
-# 5. Lambda
-# 6. EBS
-# 7. ELB
-# 8. SQS
-# 9. SNS
-# 10. KMS
-# 11. CloudFront
-# 12. CloudWatch
-# 13. CloudTrail
-# 14. Route 53
-# 15. CloudFormation
-
-# Usage: ./aws-resource-list.sh 
-# Example: ./aws-resource-list.sh
+# Author: Pratik Gupta
+# Version: v0.0.2
+#
+# Changelog:
+# v0.0.2 - Replaced read with select for interactive menu and added select menu for output format (json, table, text and yaml).
 ###############################################################
 
 # Helper functions
@@ -39,61 +22,105 @@ print_white() {
   echo -e "\e[37m$1\e[0m"
 }
 
-print_green "Option for AWS regions: us-east-1, us-east-2, us-west-1, us-west-2, ap-south-1, ap-northeast-1, ap-northeast-2, ap-southeast-1, ap-southeast-2, eu-central-1, eu-west-1, eu-west-2, sa-east-1"
-print_white "-------------------------------------------------------"
-read -p "Enter the AWS region: " aws_region
+# --- AWS Region Selection ---
+print_green "Please select an AWS region:"
+regions=("us-east-1" "us-east-2" "us-west-1" "us-west-2" "ap-south-1" "ap-northeast-1" "ap-northeast-2" "ap-northeast-3" "ap-southeast-1" "ap-southeast-2" "ca-central-1" "eu-central-1" "eu-west-1" "eu-west-2" "eu-west-3" "eu-north-1" "sa-east-1" "Quit")
+PS3="Enter the number for the AWS region: "
 
-print_green "Option for AWS services: ec2, s3, iam, rds, lambda, ebs, elb, sqs, sns, kms, cloudfront, cloudwatch, cloudtrail, route53, cloudformation"
-print_white "-------------------------------------------------------"
-read -p "Enter the AWS service name: " aws_service
+select region_choice in "${regions[@]}"; do
+  if [[ " ${regions[*]} " =~ " ${region_choice} " ]]; then
+    if [ "$region_choice" == "Quit" ]; then
+      print_red "Exiting script."
+      exit 0
+    fi
+    aws_region=$region_choice
+    print_green "You have selected region: $aws_region"
+    break
+  else
+    print_red "Invalid option. Please try again."
+  fi
+done
 
+print_white "<------------------------------------------------------------------------------------------------>"
+echo ""
+
+# --- AWS Service Selection ---
+print_green "Please select the AWS service to list resources for:"
+services=("ec2" "s3" "iam" "rds" "lambda" "ebs" "elb" "sqs" "sns" "kms" "cloudfront" "cloudwatch" "cloudtrail" "route53" "cloudformation" "Quit")
+PS3="Enter the number for the AWS service: "
+
+select service_choice in "${services[@]}"; do
+  if [[ " ${services[*]} " =~ " ${service_choice} " ]]; then
+    if [ "$service_choice" == "Quit" ]; then
+      print_red "Exiting script."
+      exit 0
+    fi
+    aws_service=$service_choice
+    print_green "You have selected service: $aws_service"
+    break
+  else
+    print_red "Invalid option. Please try again."
+  fi
+done
+
+print_white "<------------------------------------------------------------------------------------------------>"
+echo ""
+
+# --- AWS CLI Output Format Selection ---
+print_green "Please select the output format:"
+formats=("json" "table" "text" "yaml" "Quit")
+PS3="Enter the number for the output format: "
+
+select format_choice in "${formats[@]}"; do
+  if [[ " ${formats[*]} " =~ " ${format_choice} " ]]; then
+    if [ "$format_choice" == "Quit" ]; then
+      print_red "Exiting script."
+      exit 0
+    fi
+    output_format=$format_choice
+    print_green "You have selected format: $output_format"
+    break
+  else
+    print_red "Invalid option. Please try again."
+  fi
+done
+
+print_white "-------------------------------------------------------"
+echo ""
+print_green "Fetching resources for '$aws_service' in region '$aws_region' with '$output_format' format..."
+print_white "<------------------------------------------------------------------------------------------------>"
+
+# --- Execute AWS CLI command based on selection ---
+# The command is built and then evaluated to handle the conditional pipe to fx
+command_base="aws $aws_service"
+
+# Add the appropriate subcommand for the selected service
 case $aws_service in
-    "ec2")
-        aws ec2 describe-instances --region $aws_region
-        ;;
-    "s3")
-        aws s3 ls --region $aws_region
-        ;;
-    "iam")
-        aws iam list-users --region $aws_region
-        ;;
-    "rds")
-        aws rds describe-db-instances --region $aws_region
-        ;;
-    "lambda")
-        aws lambda list-functions --region $aws_region
-        ;;
-    "ebs")
-        aws ec2 describe-volumes --region $aws_region
-        ;;
-    "elb")
-        aws elb describe-load-balancers --region $aws_region
-        ;;
-    "sqs")
-        aws sqs list-queues --region $aws_region
-        ;;
-    "sns")
-        aws sns list-topics --region $aws_region
-        ;;
-    "kms")
-        aws kms list-keys --region $aws_region
-        ;;
-    "cloudfront")
-        aws cloudfront list-distributions --region $aws_region
-        ;;
-    "cloudwatch")
-        aws cloudwatch list-metrics --region $aws_region
-        ;;
-    "cloudtrail")
-        aws cloudtrail describe-trails --region $aws_region
-        ;;
-    "route53")
-        aws route53 list-hosted-zones --region $aws_region
-        ;;
-    "cloudformation")
-        aws cloudformation list-stacks --region $aws_region
-        ;;
-    *)
-        print_red "Invalid service name. Please choose from the following: ec2, s3, iam, rds, lambda, ebs, elb, sqs, sns, kms, cloudfront, cloudwatch, cloudtrail, route53, cloudformation"
-        ;;
+    "ec2") command_base="$command_base describe-instances" ;;
+    "s3") command_base="$command_base ls" ;;
+    "iam") command_base="$command_base list-users" ;;
+    "rds") command_base="$command_base describe-db-instances" ;;
+    "lambda") command_base="$command_base list-functions" ;;
+    "ebs") command_base="aws ec2 describe-volumes" ;; # EBS uses the ec2 service command
+    "elb") command_base="$command_base describe-load-balancers" ;;
+    "sqs") command_base="$command_base list-queues" ;;
+    "sns") command_base="$command_base list-topics" ;;
+    "kms") command_base="$command_base list-keys" ;;
+    "cloudfront") command_base="$command_base list-distributions" ;;
+    "cloudwatch") command_base="$command_base list-metrics" ;;
+    "cloudtrail") command_base="$command_base describe-trails" ;;
+    "route53") command_base="$command_base list-hosted-zones" ;;
+    "cloudformation") command_base="$command_base list-stacks" ;;
 esac
+
+# Construct the full command with region and output format
+full_command="$command_base --region $aws_region --output $output_format"
+
+# Only pipe to fx if the output is json, otherwise just run the command
+if [ "$output_format" == "json" ]; then
+    eval "$full_command | fx"
+else
+    eval "$full_command"
+fi
+
+print_white "<------------------------------------------------------------------------------------------------>"
