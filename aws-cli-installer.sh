@@ -19,8 +19,11 @@ print_green() {
 print_green "Updating package lists..."
 sudo apt update -y 
 
-print_green "Installing unzip and curl..."
+print_green "Installing unzip, curl and fx for json formatting..."
 sudo apt install unzip curl -y
+# The install.sh script will download the appropriate binary for your system and install it to /usr/local/bin.
+curl https://fx.wtf/install.sh | sh
+
 
 # Check if the AWS CLI is installed
 if ! command -v aws &> /dev/null; then
